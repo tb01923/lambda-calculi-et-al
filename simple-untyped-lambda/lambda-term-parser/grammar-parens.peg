@@ -1,0 +1,136 @@
+{
+    const path= require('path');
+    const applicationRoot = path.resolve('.') ;
+    const astSourcePath = applicationRoot + '/lambda-term-parser/ast.js' ;
+    const { Variable, Abstraction, Application, reduceTerms } = require(astSourcePath)
+}
+
+// https://tomassetti.me/parsing-in-javascript/
+
+//////////////////////////////////////////////////////////////////////
+// The untyped lambda calculus grammar and lex
+//////////////////////////////////////////////////////////////////////
+
+TERM
+    /*****************************************************************
+        t ::=
+                x                                       variable
+                λx.t                                    abstraction
+                t t                                     application
+    *****************************************************************/
+    = ABSTRACTION
+    / APPLICATION
+    / VARIABLE
+
+APPLICATION
+    /*****************************************************************
+        application ::= t t
+    *****************************************************************/
+    = APPLICATION_W_PARENS
+    / APPLICATION_WO_PARENS
+
+ABSTRACTION
+    /*****************************************************************
+        abstraction ::= λx.t
+    *****************************************************************/
+    = ABSTRACTION_W_PARENS
+    / ABSTRACTION_WO_PARENS
+
+VARIABLE
+    /*****************************************************************
+        variable ::= x
+    *****************************************************************/
+    =  x:CHARACTER
+    {
+        return Variable(location(), x)
+    }
+
+//////////////////////////////////////////////////////////////////////
+// Application
+//////////////////////////////////////////////////////////////////////
+
+ABSTRACTION_OR_VARIABLE
+    //////////////////////////////////////////////////////////////////
+    // "Left recursive grammar" workaround "term term" enters a loop
+    //      assuming the left side cannot match Application
+    //      remediates the left recursion issue
+    //////////////////////////////////////////////////////////////////
+    = ABSTRACTION / VARIABLE
+
+APPLICATION_W_PARENS
+    /*****************************************************************
+        '(' -> Abstraction | Variable -> Term -> ')'
+    *****************************************************************/
+    = L_PARENS lhs:ABSTRACTION_OR_VARIABLE rhs:TERM R_PARENS
+    {
+        return Application(location(), lhs, rhs, true)
+    }
+
+APP_2
+    = lhs:ABSTRACTION_OR_VARIABLE rhs:ABSTRACTION_OR_VARIABLE
+    {
+        return Application(location(), lhs, rhs, false, "APP2")
+    }
+
+APP_3
+    = lhs:APP_2 rhs:TERM
+    {
+        return Application(location(), lhs, rhs, false, "APP3")
+    }
+
+APP_ARR
+    = terms:ABSTRACTION_OR_VARIABLE*
+   {
+        return reduceTerms(location(), terms)
+   }
+
+APPLICATION_WO_PARENS
+    /*****************************************************************
+        Abstraction | Variable -> Term
+    *****************************************************************/
+    = APP_ARR
+
+
+//////////////////////////////////////////////////////////////////////
+// Abstraction
+//////////////////////////////////////////////////////////////////////
+
+ABSTRACTION_W_PARENS
+    /*****************************************************************
+            '(' -> 'λ' -> Variable -> '.' -> TERM -> ')'
+    *****************************************************************/
+    = L_PARENS LAMBDA x:CHARACTER DOT term:TERM R_PARENS
+    {
+        return Abstraction(location(), x, term, true)
+    }
+
+ABSTRACTION_WO_PARENS
+    /*****************************************************************
+            'λ' -> Variable -> '.' -> Term
+    *****************************************************************/
+   = LAMBDA x:CHARACTER DOT term:TERM
+   {
+        return Abstraction(location(), x, term, false)
+   }
+
+//////////////////////////////////////////////////////////////////////
+// Atoms
+//////////////////////////////////////////////////////////////////////
+
+LAMBDA
+    = 'λ'
+
+L_PARENS
+    = '('
+
+R_PARENS
+    = ')'
+
+DOT
+    = '.'
+
+CHARACTER
+    = [A-Za-z]
+    {
+        return text().trim() ;
+    }

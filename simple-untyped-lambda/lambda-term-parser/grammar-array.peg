@@ -1,0 +1,103 @@
+{
+    const path= require('path');
+    const applicationRoot = path.resolve('.') ;
+    const astSourcePath = applicationRoot + '/lambda-term-parser/ast.js' ;
+    const { Variable, Abstraction, reduceTerms, setParens } = require(astSourcePath)
+}
+
+// https://tomassetti.me/parsing-in-javascript/
+
+//////////////////////////////////////////////////////////////////////
+// The untyped lambda calculus grammar and lex
+//////////////////////////////////////////////////////////////////////
+
+TERM
+    /*****************************************************************
+        t ::=
+                x                                       variable
+                λx.t                                    abstraction
+                t t                                     application
+    *****************************************************************/
+    = ABSTRACTION
+    / APPLICATION
+
+TERM_OR_VARIABLE
+    = L_PARENS x:TERM R_PARENS
+    {
+        return setParens(x)
+    }
+    / VARIABLE
+
+VARIABLE
+    /*****************************************************************
+        variable ::= x
+    *****************************************************************/
+    = x:CHARACTER
+    {
+        return Variable(location(), x)
+    }
+
+//////////////////////////////////////////////////////////////////////
+// Application
+//////////////////////////////////////////////////////////////////////
+
+APPLICATION
+    /*****************************************************************
+        Term | Variable -> END
+    *****************************************************************/
+    = x:TERM_OR_VARIABLE END
+    {
+        return x
+    }
+    /*****************************************************************
+        Term | Variable -> ?
+    *****************************************************************/
+    / x:TERM_OR_VARIABLE !TERM_OR_VARIABLE
+    {
+        return x
+    }
+    /*****************************************************************
+        Term | Variable -> Term | Variable -> ... -> Term | Variable
+    *****************************************************************/
+    / terms:TERM_OR_VARIABLE*
+    {
+        return reduceTerms(location(), terms)
+    }
+
+//////////////////////////////////////////////////////////////////////
+// Abstraction
+//////////////////////////////////////////////////////////////////////
+
+ABSTRACTION
+    /*****************************************************************
+        'λ' -> Variable -> '.' -> Term
+    *****************************************************************/
+    = LAMBDA x:CHARACTER DOT term:TERM
+    {
+        return Abstraction(location(), x, term, false)
+    }
+
+//////////////////////////////////////////////////////////////////////
+// Base Tokens
+//////////////////////////////////////////////////////////////////////
+
+LAMBDA
+    = 'λ'
+
+DOT
+    = '.'
+
+CHARACTER
+    = [A-Za-z]
+
+END
+    /*****************************************************************
+        Essentially not (!) anything (.) - aka Epsilon
+    *****************************************************************/
+    = !.
+
+L_PARENS
+    = '('
+
+R_PARENS
+    = ')'

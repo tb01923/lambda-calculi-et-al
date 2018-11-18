@@ -1,0 +1,113 @@
+{
+    const path= require('path');
+    const applicationRoot = path.resolve('.') ;
+    const astSourcePath = applicationRoot + '/lambda-term-parser/ast.js' ;
+    const { Variable, Abstraction, Application, reduceTerms } = require(astSourcePath)
+}
+
+// https://tomassetti.me/parsing-in-javascript/
+
+//////////////////////////////////////////////////////////////////////
+// The untyped lambda calculus grammar and lex
+//////////////////////////////////////////////////////////////////////
+
+TERM
+    /*****************************************************************
+        t ::=
+                x                                       variable
+                λx.t                                    abstraction
+                t t                                     application
+    *****************************************************************/
+    = ABSTRACTION
+    / APPLICATION
+
+TERM_OR_VARIABLE
+    = L_PARENS TERM R_PARENS
+    / VARIABLE
+
+
+APPLICATION
+    /*****************************************************************
+        application ::= t t
+    *****************************************************************/
+    = APPLICATION_WO_PARENS
+
+ABSTRACTION
+    /*****************************************************************
+        abstraction ::= λx.t
+    *****************************************************************/
+    = ABSTRACTION_WO_PARENS
+
+VARIABLE
+    /*****************************************************************
+        variable ::= x
+    *****************************************************************/
+    = x:CHARACTER
+    {
+        return Variable(location(), x)
+    }
+
+//////////////////////////////////////////////////////////////////////
+// Application
+//////////////////////////////////////////////////////////////////////
+APP
+   = lhs:TERM_OR_VARIABLE rhs:APP_
+   {
+        console.log(lhs, rhs)
+        return Application(location(), lhs, rhs, false, "APP")
+   }
+
+APP_
+    = lhs:TERM_OR_VARIABLE rhs:APP_
+    {
+        return Application(location(), lhs, rhs, false, "APP_")
+    }
+    / lhs:TERM_OR_VARIABLE END
+    {
+        return lhs
+    }
+
+END
+    = !.
+
+APPLICATION_WO_PARENS
+    /*****************************************************************
+        Abstraction | Variable -> Term
+    *****************************************************************/
+    = APP
+
+
+//////////////////////////////////////////////////////////////////////
+// Abstraction
+//////////////////////////////////////////////////////////////////////
+
+ABSTRACTION_WO_PARENS
+    /*****************************************************************
+            'λ' -> Variable -> '.' -> Term
+    *****************************************************************/
+    = LAMBDA x:CHARACTER DOT term:TERM
+    {
+        return Abstraction(location(), x, term, false)
+    }
+
+//////////////////////////////////////////////////////////////////////
+// Base Tokens
+//////////////////////////////////////////////////////////////////////
+
+LAMBDA
+    = 'λ'
+
+DOT
+    = '.'
+
+CHARACTER
+    = [A-Za-z]
+    {
+        return text().trim() ;
+    }
+
+L_PARENS
+    = '('
+
+R_PARENS
+    = ')'
